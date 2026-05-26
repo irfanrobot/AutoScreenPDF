@@ -118,13 +118,20 @@ class ScreenPrinterApp:
         messagebox.showinfo("Select Next Button", "Move your mouse to the Next button and press the 's' key to save the coordinate.")
         
         def on_key_event(e):
-            if e.name == 's':
-                x, y = pyautogui.position()
-                self.entry_next.delete(0, tk.END)
-                self.entry_next.insert(0, f"{x}, {y}")
-                keyboard.unhook_all()
+            x, y = pyautogui.position()
+            self.entry_next.delete(0, tk.END)
+            self.entry_next.insert(0, f"{x}, {y}")
+            # Clean up after a brief delay to ensure no trailing 's' remains
+            self.root.after(50, self.clean_entry_next)
+            keyboard.unhook_all()
         
-        keyboard.on_press(on_key_event)
+        keyboard.on_press_key('s', on_key_event, suppress=True)
+
+    def clean_entry_next(self):
+        val = self.entry_next.get()
+        cleaned = "".join([c for c in val if c.isdigit() or c in (',', ' ')]).strip()
+        self.entry_next.delete(0, tk.END)
+        self.entry_next.insert(0, cleaned)
 
     def sleep_with_cancel_check(self, seconds):
         # Checks every 100ms for 'ESC' key to cancel early
