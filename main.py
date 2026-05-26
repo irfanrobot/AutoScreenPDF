@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox
 import pyautogui
 import keyboard
 import time
-from PIL import Image, ImageGrab
+from PIL import Image, ImageGrab, ImageChops, ImageStat
 import os
 import json
 
@@ -14,95 +14,277 @@ class ScreenPrinterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("AutoPDF Screen Printer")
-        self.root.geometry("450x400")
+        self.root.geometry("450x460")
         
         self.screenshots = []
         self.config_file = "config.json"
         
+        # Track printing areas separately for each mode
+        self.printing_area_button = ""
+        self.printing_area_scroll = ""
+        
         self.setup_ui()
+        
+        # Track previous mode for area transition saving
+        self.prev_mode = self.mode_var.get()
         self.load_config()
 
     def setup_ui(self):
         tk.Label(self.root, text="AutoPDF Screen Printer", font=("Arial", 16, "bold")).pack(pady=10)
         
-        # Frame Area
-        frame_area = tk.LabelFrame(self.root, text="1. Printing Area (x1, y1, x2, y2)", padx=10, pady=5)
-        frame_area.pack(fill="x", padx=15, pady=5)
+        # Mode Selection
+        self.mode_var = tk.StringVar(value="button")
+        frame_mode = tk.Frame(self.root)
+        frame_mode.pack(pady=5)
+        tk.Radiobutton(frame_mode, text="Button Mode", variable=self.mode_var, value="button", command=self.on_mode_change, font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=15)
+        tk.Radiobutton(frame_mode, text="Scroll Mode", variable=self.mode_var, value="scroll", command=self.on_mode_change, font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=15)
         
-        self.btn_select_area = tk.Button(frame_area, text="Select on Screen", command=self.select_area)
+        # Frame Area
+        self.frame_area = tk.LabelFrame(self.root, text="1. Printing Area (x1, y1, x2, y2)", padx=10, pady=5)
+        self.frame_area.pack(fill="x", padx=15, pady=5)
+        
+        self.btn_select_area = tk.Button(self.frame_area, text="Select on Screen", command=self.select_area)
         self.btn_select_area.pack(side=tk.LEFT, padx=5)
         
-        self.entry_area = tk.Entry(frame_area)
+        self.entry_area = tk.Entry(self.frame_area)
         self.entry_area.pack(side=tk.LEFT, fill="x", expand=True, padx=5)
         
-        # Frame Next Button
-        frame_next = tk.LabelFrame(self.root, text="2. Next Button Position (x, y)", padx=10, pady=5)
-        frame_next.pack(fill="x", padx=15, pady=5)
+        # Frame Next Button (Button Mode Specific)
+        self.frame_next = tk.LabelFrame(self.root, text="2. Next Button Position (x, y)", padx=10, pady=5)
+        self.frame_next.pack(fill="x", padx=15, pady=5)
         
-        self.btn_select_next = tk.Button(frame_next, text="Select on Screen", command=self.select_next_button)
+        self.btn_select_next = tk.Button(self.frame_next, text="Select on Screen", command=self.select_next_button)
         self.btn_select_next.pack(side=tk.LEFT, padx=5)
         
-        self.entry_next = tk.Entry(frame_next)
+        self.entry_next = tk.Entry(self.frame_next)
         self.entry_next.pack(side=tk.LEFT, fill="x", expand=True, padx=5)
         
-        # Click Delay & Total Clicks Frame
-        frame_settings = tk.Frame(self.root)
-        frame_settings.pack(fill="x", padx=15, pady=5)
+        # Frame Scroll Settings (Scroll Mode Specific, hidden by default)
+        self.frame_scroll = tk.LabelFrame(self.root, text="2. Scroll Settings", padx=10, pady=5)
+        
+        self.scroll_method_var = tk.StringVar(value="key")
+        frame_sm = tk.Frame(self.frame_scroll)
+        frame_sm.pack(fill="x", pady=2)
+        tk.Radiobutton(frame_sm, text="Key Press:", variable=self.scroll_method_var, value="key", command=self.on_scroll_method_change).pack(side=tk.LEFT)
+        self.entry_scroll_key = tk.Entry(frame_sm, width=10)
+        self.entry_scroll_key.insert(0, "pagedown")
+        self.entry_scroll_key.pack(side=tk.LEFT, padx=5)
+        tk.Label(frame_sm, text="(e.g., pagedown, space)", fg="gray", font=("Arial", 8)).pack(side=tk.LEFT)
+        
+        frame_ms = tk.Frame(self.frame_scroll)
+        frame_ms.pack(fill="x", pady=2)
+        tk.Radiobutton(frame_ms, text="Mouse Scroll:", variable=self.scroll_method_var, value="mouse", command=self.on_scroll_method_change).pack(side=tk.LEFT)
+        self.entry_scroll_ticks = tk.Entry(frame_ms, width=8)
+        self.entry_scroll_ticks.insert(0, "-100")
+        self.entry_scroll_ticks.pack(side=tk.LEFT, padx=5)
+        
+        # Test Scroll Button
+        self.btn_test_scroll = tk.Button(frame_ms, text="Test Scroll", command=self.test_scroll, font=("Arial", 8))
+        self.btn_test_scroll.pack(side=tk.LEFT, padx=5)
+        
+        # Optional Next Button in Scroll Mode
+        frame_scroll_next = tk.Frame(self.frame_scroll)
+        frame_scroll_next.pack(fill="x", pady=5)
+        tk.Label(frame_scroll_next, text="Next Button (optional, x, y):", font=("Arial", 9)).pack(side=tk.LEFT)
+        self.btn_select_scroll_next = tk.Button(frame_scroll_next, text="Select", command=self.select_scroll_next_button, font=("Arial", 8))
+        self.btn_select_scroll_next.pack(side=tk.LEFT, padx=5)
+        self.entry_scroll_next = tk.Entry(frame_scroll_next)
+        self.entry_scroll_next.pack(side=tk.LEFT, fill="x", expand=True, padx=5)
+        
+        # Click Delay, Total Clicks & Pages Frame
+        self.frame_settings = tk.Frame(self.root)
+        self.frame_settings.pack(fill="x", padx=15, pady=5)
         
         # Click Delay
-        frame_delay = tk.Frame(frame_settings)
+        frame_delay = tk.Frame(self.frame_settings)
         frame_delay.pack(side=tk.LEFT, fill="x", expand=True)
-        tk.Label(frame_delay, text="Delay (seconds):").pack(side=tk.LEFT)
-        self.entry_delay = tk.Entry(frame_delay, width=8)
+        tk.Label(frame_delay, text="Delay (s):").pack(side=tk.LEFT)
+        self.entry_delay = tk.Entry(frame_delay, width=6)
         self.entry_delay.insert(0, "1.0")
-        self.entry_delay.pack(side=tk.LEFT, padx=5)
+        self.entry_delay.pack(side=tk.LEFT, padx=3)
         
-        # Total Click
-        frame_total = tk.Frame(frame_settings)
+        # Total Click / Scrolls per page
+        frame_total = tk.Frame(self.frame_settings)
         frame_total.pack(side=tk.LEFT, fill="x", expand=True)
-        tk.Label(frame_total, text="Total Clicks:").pack(side=tk.LEFT)
-        self.entry_total = tk.Entry(frame_total, width=8)
+        self.lbl_total = tk.Label(frame_total, text="Total Clicks:")
+        self.lbl_total.pack(side=tk.LEFT)
+        self.entry_total = tk.Entry(frame_total, width=6)
         self.entry_total.insert(0, "5")
-        self.entry_total.pack(side=tk.LEFT, padx=5)
+        self.entry_total.pack(side=tk.LEFT, padx=3)
+        
+        # Images Per Page / Total Pages
+        frame_ipp = tk.Frame(self.frame_settings)
+        frame_ipp.pack(side=tk.LEFT, fill="x", expand=True)
+        self.lbl_ipp = tk.Label(frame_ipp, text="Images/Page:")
+        self.lbl_ipp.pack(side=tk.LEFT)
+        self.entry_ipp = tk.Entry(frame_ipp, width=6)
+        self.entry_ipp.insert(0, "1")
+        self.entry_ipp.pack(side=tk.LEFT, padx=3)
+        
+        # Auto Stitch Checkbox
+        self.stitch_var = tk.BooleanVar(value=True)
+        self.chk_stitch = tk.Checkbutton(self.root, text="Auto-Stitch (Remove Overlap in Scroll Mode)", variable=self.stitch_var, font=("Arial", 9))
+        self.chk_stitch.pack(pady=5)
         
         # Action Buttons Frame
-        frame_actions = tk.Frame(self.root)
-        frame_actions.pack(pady=15)
+        self.frame_actions = tk.Frame(self.root)
+        self.frame_actions.pack(pady=10)
         
-        self.btn_save_config = tk.Button(frame_actions, text="Save Config", command=self.save_config, font=("Arial", 10))
+        self.btn_save_config = tk.Button(self.frame_actions, text="Save Config", command=self.save_config, font=("Arial", 10))
         self.btn_save_config.pack(side=tk.LEFT, padx=10)
         
-        self.btn_start = tk.Button(frame_actions, text="Start & Save to PDF", command=self.start_process, bg="green", fg="white", font=("Arial", 11, "bold"))
+        self.btn_start = tk.Button(self.frame_actions, text="Start & Save to PDF", command=self.start_process, bg="green", fg="white", font=("Arial", 11, "bold"))
         self.btn_start.pack(side=tk.LEFT, padx=10)
         
-        tk.Label(self.root, text="Tip: Press 'ESC' key to cancel while program is running.", fg="gray", font=("Arial", 9, "italic")).pack()
+        self.lbl_tip = tk.Label(self.root, text="Tip: Press 'ESC' key to cancel while program is running.", fg="gray", font=("Arial", 9, "italic"))
+        self.lbl_tip.pack()
+        
+        # Initial pack states
+        self.on_mode_change(init_call=True)
+        self.on_scroll_method_change()
+
+    def on_mode_change(self, init_call=False):
+        # 1. Save current area entry value to previous mode's variable (if not initial call)
+        if not init_call:
+            if self.prev_mode == "button":
+                self.printing_area_button = self.entry_area.get()
+            else:
+                self.printing_area_scroll = self.entry_area.get()
+        
+        # 2. Update tracking variable
+        new_mode = self.mode_var.get()
+        self.prev_mode = new_mode
+
+        # 3. Load printing area of the newly selected mode into the entry box
+        self.entry_area.delete(0, tk.END)
+        if new_mode == "button":
+            self.entry_area.insert(0, self.printing_area_button)
+            self.lbl_total.config(text="Total Clicks:")
+            self.lbl_ipp.config(text="Images/Page:")
+        else:
+            self.entry_area.insert(0, self.printing_area_scroll)
+            self.lbl_total.config(text="Scrolls/Page:")
+            self.lbl_ipp.config(text="Total Pages:")
+
+        # 4. Refresh layout
+        self.frame_area.pack_forget()
+        self.frame_next.pack_forget()
+        self.frame_scroll.pack_forget()
+        self.frame_settings.pack_forget()
+        self.chk_stitch.pack_forget()
+        self.frame_actions.pack_forget()
+        self.lbl_tip.pack_forget()
+        
+        self.frame_area.pack(fill="x", padx=15, pady=5)
+        if new_mode == "button":
+            self.frame_next.pack(fill="x", padx=15, pady=5)
+        else:
+            self.frame_scroll.pack(fill="x", padx=15, pady=5)
+            
+        self.frame_settings.pack(fill="x", padx=15, pady=5)
+        self.chk_stitch.pack(pady=5)
+        self.frame_actions.pack(pady=10)
+        self.lbl_tip.pack()
+
+    def on_scroll_method_change(self):
+        method = self.scroll_method_var.get()
+        if method == "key":
+            self.entry_scroll_key.config(state="normal")
+            self.entry_scroll_ticks.config(state="disabled")
+            self.btn_test_scroll.config(state="disabled")
+        else:
+            self.entry_scroll_key.config(state="disabled")
+            self.entry_scroll_ticks.config(state="normal")
+            self.btn_test_scroll.config(state="normal")
+
+    def test_scroll(self):
+        try:
+            ticks = int(self.entry_scroll_ticks.get().strip())
+        except ValueError:
+            messagebox.showerror("Error", "Please input a valid integer for scroll ticks.")
+            return
+            
+        # Temporarily hide window to allow user to point mouse to target document
+        self.root.withdraw()
+        time.sleep(1.5) # Give user 1.5 seconds to reposition cursor
+        
+        x, y = pyautogui.position()
+        pyautogui.scroll(ticks, x=x, y=y)
+        
+        self.root.deiconify()
 
     def load_config(self):
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, "r") as f:
                     config = json.load(f)
-                    
-                self.entry_area.delete(0, tk.END)
-                self.entry_area.insert(0, config.get("printing_area", ""))
+                
+                # Load mode first
+                active_mode = config.get("mode", "button")
+                self.mode_var.set(active_mode)
+                self.prev_mode = active_mode
+                
+                # Load printing areas
+                self.printing_area_button = config.get("printing_area_button", "")
+                self.printing_area_scroll = config.get("printing_area_scroll", "")
+                
+                # Migrate old format if needed
+                if not self.printing_area_button and not self.printing_area_scroll:
+                    old_area = config.get("printing_area", "")
+                    if active_mode == "button":
+                        self.printing_area_button = old_area
+                    else:
+                        self.printing_area_scroll = old_area
+                
+                self.on_mode_change(init_call=True)
                 
                 self.entry_next.delete(0, tk.END)
                 self.entry_next.insert(0, config.get("next_button", ""))
+                
+                self.scroll_method_var.set(config.get("scroll_method", "key"))
+                self.on_scroll_method_change()
+                
+                self.entry_scroll_key.delete(0, tk.END)
+                self.entry_scroll_key.insert(0, config.get("scroll_key", "pagedown"))
+                
+                self.entry_scroll_ticks.delete(0, tk.END)
+                self.entry_scroll_ticks.insert(0, config.get("scroll_ticks", "-100"))
+                
+                self.entry_scroll_next.delete(0, tk.END)
+                self.entry_scroll_next.insert(0, config.get("scroll_next_button", ""))
                 
                 self.entry_delay.delete(0, tk.END)
                 self.entry_delay.insert(0, config.get("click_delay", "1.0"))
                 
                 self.entry_total.delete(0, tk.END)
                 self.entry_total.insert(0, config.get("total_clicks", "5"))
+                
+                self.entry_ipp.delete(0, tk.END)
+                self.entry_ipp.insert(0, config.get("images_per_page", "1"))
+                
+                self.stitch_var.set(config.get("auto_stitch", True))
             except Exception as e:
                 print(f"Error loading config: {e}")
 
     def save_config(self, show_msg=True):
+        if self.mode_var.get() == "button":
+            self.printing_area_button = self.entry_area.get()
+        else:
+            self.printing_area_scroll = self.entry_area.get()
+
         config = {
-            "printing_area": self.entry_area.get(),
+            "mode": self.mode_var.get(),
+            "printing_area_button": self.printing_area_button,
+            "printing_area_scroll": self.printing_area_scroll,
             "next_button": self.entry_next.get(),
+            "scroll_method": self.scroll_method_var.get(),
+            "scroll_key": self.entry_scroll_key.get(),
+            "scroll_ticks": self.entry_scroll_ticks.get(),
+            "scroll_next_button": self.entry_scroll_next.get(),
             "click_delay": self.entry_delay.get(),
-            "total_clicks": self.entry_total.get()
+            "total_clicks": self.entry_total.get(),
+            "images_per_page": self.entry_ipp.get(),
+            "auto_stitch": self.stitch_var.get()
         }
         try:
             with open(self.config_file, "w") as f:
@@ -171,11 +353,30 @@ class ScreenPrinterApp:
         
         keyboard.on_press_key('s', on_key_event, suppress=True)
 
+    def select_scroll_next_button(self):
+        messagebox.showinfo("Select Next Button", "Move your mouse to the Next button and press the 's' key to save the coordinate.")
+        
+        def on_key_event(e):
+            x, y = pyautogui.position()
+            self.entry_scroll_next.delete(0, tk.END)
+            self.entry_scroll_next.insert(0, f"{x}, {y}")
+            # Clean up after a brief delay
+            self.root.after(50, self.clean_entry_scroll_next)
+            keyboard.unhook_all()
+            
+        keyboard.on_press_key('s', on_key_event, suppress=True)
+
     def clean_entry_next(self):
         val = self.entry_next.get()
         cleaned = "".join([c for c in val if c.isdigit() or c in (',', ' ')]).strip()
         self.entry_next.delete(0, tk.END)
         self.entry_next.insert(0, cleaned)
+
+    def clean_entry_scroll_next(self):
+        val = self.entry_scroll_next.get()
+        cleaned = "".join([c for c in val if c.isdigit() or c in (',', ' ')]).strip()
+        self.entry_scroll_next.delete(0, tk.END)
+        self.entry_scroll_next.insert(0, cleaned)
 
     def sleep_with_cancel_check(self, seconds):
         # Checks every 100ms for 'ESC' key to cancel early
@@ -190,7 +391,72 @@ class ScreenPrinterApp:
             return False
         return True
 
+    def find_overlap(self, img1, img2, max_overlap_pct=0.9, min_overlap_pixels=15):
+        w, h = img1.size
+        min_s = int(h * (1 - max_overlap_pct))
+        max_s = h - min_overlap_pixels
+        
+        g1 = img1.convert("L")
+        g2 = img2.convert("L")
+        
+        best_s = None
+        min_mean_diff = 255.0
+        
+        for s in range(min_s, max_s):
+            overlap_h = h - s
+            crop1 = g1.crop((0, s, w, h))
+            crop2 = g2.crop((0, 0, w, overlap_h))
+            
+            diff = ImageChops.difference(crop1, crop2)
+            stat = ImageStat.Stat(diff)
+            mean_diff = stat.mean[0]
+            
+            if mean_diff < min_mean_diff:
+                min_mean_diff = mean_diff
+                best_s = s
+                
+        if min_mean_diff < 4.0: # threshold of average pixel diff < 4/255
+            return best_s
+        return None
+
+    def stitch_screenshots_into_single_image(self, screenshots, auto_stitch):
+        if not screenshots:
+            return None
+        if len(screenshots) == 1:
+            return screenshots[0]
+            
+        w = screenshots[0].width
+        h = screenshots[0].height
+        
+        combined_image = screenshots[0]
+        
+        for i in range(1, len(screenshots)):
+            prev_img = screenshots[i-1]
+            next_img = screenshots[i]
+            
+            s = self.find_overlap(prev_img, next_img) if auto_stitch else None
+            if s is not None:
+                # Crop the bottom part of next_img that is new
+                overlap_h = h - s
+                cropped = next_img.crop((0, overlap_h, w, next_img.height))
+                
+                new_combined = Image.new("RGB", (w, combined_image.height + cropped.height))
+                new_combined.paste(combined_image, (0, 0))
+                new_combined.paste(cropped, (0, combined_image.height))
+                combined_image = new_combined
+            else:
+                # No overlap found, stack fully
+                new_combined = Image.new("RGB", (w, combined_image.height + next_img.height))
+                new_combined.paste(combined_image, (0, 0))
+                new_combined.paste(next_img, (0, combined_image.height))
+                combined_image = new_combined
+                
+        return combined_image
+
     def start_process(self):
+        # Get active mode
+        mode = self.mode_var.get()
+
         # 1. Parse Area coords
         area_str = self.entry_area.get().strip()
         try:
@@ -201,22 +467,56 @@ class ScreenPrinterApp:
             messagebox.showerror("Error", "Please select or input printing area coordinates manually in format: x1, y1, x2, y2")
             return
 
-        # 2. Parse Next button coords
-        next_str = self.entry_next.get().strip()
-        try:
-            next_coords = [int(x.strip()) for x in next_str.split(",") if x.strip()]
-            if len(next_coords) != 2:
-                raise ValueError()
-        except ValueError:
-            messagebox.showerror("Error", "Please select or input Next button coordinates manually in format: x, y")
-            return
+        # 2. Mode dependent coordinates parsing
+        next_coords = None
+        scroll_key = None
+        scroll_ticks = None
+        scroll_method = None
+        scroll_next_coords = None
+        
+        if mode == "button":
+            next_str = self.entry_next.get().strip()
+            try:
+                next_coords = [int(x.strip()) for x in next_str.split(",") if x.strip()]
+                if len(next_coords) != 2:
+                    raise ValueError()
+            except ValueError:
+                messagebox.showerror("Error", "Please select or input Next button coordinates manually in format: x, y")
+                return
+        else: # scroll mode
+            scroll_method = self.scroll_method_var.get()
+            if scroll_method == "key":
+                scroll_key = self.entry_scroll_key.get().strip()
+                if not scroll_key:
+                    messagebox.showerror("Error", "Please input a valid scroll keyboard key (e.g., pagedown).")
+                    return
+            else:
+                try:
+                    scroll_ticks = int(self.entry_scroll_ticks.get().strip())
+                except ValueError:
+                    messagebox.showerror("Error", "Please input a valid integer for mouse scroll ticks.")
+                    return
             
-        # 3. Parse click settings
+            # Optional next button coordinate
+            scroll_next_str = self.entry_scroll_next.get().strip()
+            if scroll_next_str:
+                try:
+                    scroll_next_coords = [int(x.strip()) for x in scroll_next_str.split(",") if x.strip()]
+                    if len(scroll_next_coords) != 2:
+                        raise ValueError()
+                except ValueError:
+                    messagebox.showerror("Error", "Optional Next Button coordinate format invalid. Must be: x, y")
+                    return
+            
+        # 3. Parse click / image compilation settings
         try:
             delay = float(self.entry_delay.get())
             total_clicks = int(self.entry_total.get())
+            images_per_page = int(self.entry_ipp.get())
+            if images_per_page < 1:
+                raise ValueError()
         except ValueError:
-            messagebox.showerror("Error", "Invalid delay or total clicks value.")
+            messagebox.showerror("Error", "Invalid inputs. Delay, click/scroll settings, and page settings must be valid positive numbers.")
             return
             
         # 4. Save destination
@@ -231,29 +531,101 @@ class ScreenPrinterApp:
         time.sleep(1) # Wait for window to hide
         
         try:
-            self.screenshots = []
+            pdf_pages = []
             
-            for i in range(total_clicks):
-                # Check cancellation
-                if keyboard.is_pressed('esc'):
-                    raise Exception("Process cancelled by user (ESC pressed).")
-
-                # Take screenshot
-                img = ImageGrab.grab(bbox=rect_coords)
-                if img.mode == 'RGBA':
-                    img = img.convert('RGB')
-                self.screenshots.append(img)
-                
-                if i < total_clicks - 1: # Don't click on the last iteration
-                    # Click next
-                    pyautogui.click(next_coords[0], next_coords[1])
-                    # Wait with cancel check
-                    if not self.sleep_with_cancel_check(delay):
+            if mode == "button":
+                # Button Mode logic: simple capture loop, then optionally compile
+                self.screenshots = []
+                for i in range(total_clicks):
+                    if keyboard.is_pressed('esc'):
                         raise Exception("Process cancelled by user (ESC pressed).")
+                        
+                    img = ImageGrab.grab(bbox=rect_coords)
+                    if img.mode == 'RGBA':
+                        img = img.convert('RGB')
+                    self.screenshots.append(img)
                     
+                    if i < total_clicks - 1:
+                        pyautogui.click(next_coords[0], next_coords[1])
+                        if not self.sleep_with_cancel_check(delay):
+                            raise Exception("Process cancelled by user (ESC pressed).")
+                            
+                # Group screenshots based on images_per_page
+                if images_per_page > 1:
+                    for i in range(0, len(self.screenshots), images_per_page):
+                        chunk = self.screenshots[i:i + images_per_page]
+                        max_width = max(img.width for img in chunk)
+                        total_height = sum(img.height for img in chunk)
+                        combined_img = Image.new("RGB", (max_width, total_height), "white")
+                        current_y = 0
+                        for img in chunk:
+                            combined_img.paste(img, (0, current_y))
+                            current_y += img.height
+                        pdf_pages.append(combined_img)
+                else:
+                    pdf_pages = self.screenshots
+                    
+            else:
+                # Scroll Mode logic:
+                # Total Pages (images_per_page input)
+                # Scrolls per page (total_clicks input)
+                # Auto-stitch resets per page
+                
+                center_x = (rect_coords[0] + rect_coords[2]) // 2
+                center_y = (rect_coords[1] + rect_coords[3]) // 2
+                
+                for p in range(images_per_page):
+                    # Check cancellation
+                    if keyboard.is_pressed('esc'):
+                        raise Exception("Process cancelled by user (ESC pressed).")
+
+                    # Focus the target window at the start of every page
+                    pyautogui.click(center_x, center_y)
+                    time.sleep(0.5) # Wait for focus to register
+
+                    page_screenshots = []
+                    
+                    # 1. Take initial screenshot for the page
+                    img = ImageGrab.grab(bbox=rect_coords)
+                    if img.mode == 'RGBA':
+                        img = img.convert('RGB')
+                    page_screenshots.append(img)
+                    
+                    # 2. Perform scrolls and take screenshots
+                    for s in range(total_clicks):
+                        if keyboard.is_pressed('esc'):
+                            raise Exception("Process cancelled by user (ESC pressed).")
+                            
+                        # Scroll
+                        if scroll_method == "key":
+                            pyautogui.press(scroll_key)
+                        else:
+                            pyautogui.scroll(scroll_ticks, x=center_x, y=center_y)
+                            
+                        # Wait
+                        if not self.sleep_with_cancel_check(delay):
+                            raise Exception("Process cancelled by user (ESC pressed).")
+                            
+                        # Take screenshot
+                        img = ImageGrab.grab(bbox=rect_coords)
+                        if img.mode == 'RGBA':
+                            img = img.convert('RGB')
+                        page_screenshots.append(img)
+                    
+                    # 3. Stitch page_screenshots into 1 full page image
+                    stitched_page = self.stitch_screenshots_into_single_image(page_screenshots, self.stitch_var.get())
+                    pdf_pages.append(stitched_page)
+                    
+                    # 4. If there's an optional Next button and we have more pages, click it
+                    if p < images_per_page - 1 and scroll_next_coords:
+                        pyautogui.click(scroll_next_coords[0], scroll_next_coords[1])
+                        # Wait for page transition loading
+                        if not self.sleep_with_cancel_check(delay + 1.0): # Extra 1.0s to allow next page to load fully
+                            raise Exception("Process cancelled by user (ESC pressed).")
+
             # Save to PDF
-            if self.screenshots:
-                self.screenshots[0].save(pdf_path, save_all=True, append_images=self.screenshots[1:])
+            if pdf_pages:
+                pdf_pages[0].save(pdf_path, save_all=True, append_images=pdf_pages[1:])
                 messagebox.showinfo("Success", f"PDF saved successfully to:\n{pdf_path}")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred during processing:\n{str(e)}")

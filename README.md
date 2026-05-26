@@ -1,14 +1,19 @@
 # ScreenPDF (AutoPDF Screen Printer)
 
-Python-based automated utility to take multiple sequential screenshots of a selected screen area and convert them into a single PDF document. This project is a Python recreation of the [plainprinter](https://github.com/plainlab/plainprinter) tool.
+Python-based automated utility to take multiple sequential screenshots of a selected screen area and convert them into a single PDF document. This project is a Python recreation of the [plainprinter](https://github.com/plainlab/plainprinter) tool, now featuring scroll-based capture.
 
 ## Features
 
 - **Select Printing Area**: Draw a red rectangle over a transparent overlay to select the screen area you want to screenshot.
-- **Select Next Button**: Position your mouse over the "Next" page button and press `s` to save the click coordinate.
-- **Configurable Click Delay**: Set a delay (in seconds) between capturing a page and clicking the next button to allow contents to load properly.
-- **Total Clicks**: Choose how many screenshots you want to take.
+- **Two Capture Modes**:
+  - **Button Mode**: Automate navigation by clicking a next-page button at a specific coordinate (saves X, Y mouse position via hotkey).
+  - **Scroll Mode**: Automate navigation by simulating keyboard keypresses (e.g. `pagedown`, `space`, `down` arrow) or mouse scroll ticks (e.g., `-100` ticks).
+- **Auto-Focus Target**: In Scroll Mode, automatically clicks the center of the printing area once before starting to ensure the target window has keyboard focus.
+- **Configurable Click Delay**: Set a delay (in seconds) between capturing a page and scrolling/clicking to allow contents to load properly.
+- **Total Clicks / Pages**: Choose how many screenshots you want to take.
 - **Auto-Export to PDF**: Compiles all screenshots directly into a single PDF file of your choice.
+- **Local Configurations**: Automatically saves and loads your last configurations from `config.json`.
+- **Easy Cancellation**: Press the `ESC` key at any point while the process is running to cancel instantly.
 
 ## Prerequisites
 
@@ -46,16 +51,20 @@ Python-based automated utility to take multiple sequential screenshots of a sele
 ## Usage
 
 1. **Run the Application**:
+   Double click the `run.bat` file or run:
    ```bash
    python main.py
    ```
-2. Click **Select Printing Area**: Drag your mouse to draw a box around the area you want to scan/screenshot.
-3. Click **Select Next Button**: Place your mouse pointer over the "Next" button of the document/webpage you are capturing, and press the `s` key on your keyboard to lock the position.
-4. Set the **Click Delay (seconds)** and **Total Clicks**.
-5. Click **Start & Save to PDF**:
+2. **Select Mode**: Choose between **Button Mode** or **Scroll Mode** at the top of the GUI.
+3. **Select Printing Area**: Click "Select on Screen" and drag your mouse to draw a box around the area you want to screenshot.
+4. **Configure Navigation**:
+   - **For Button Mode**: Place your mouse pointer over the "Next Page" button and press the `s` key to save the position.
+   - **For Scroll Mode**: Select either **Key Press** (e.g., `pagedown`) or **Mouse Scroll** (e.g., `-100` ticks to scroll down).
+5. Set the **Delay (seconds)** and **Total Clicks**.
+6. Click **Start & Save to PDF**:
    - Choose where to save your output PDF file.
-   - The application will automatically take screenshots, click the next button, wait, and repeat until done.
-   - Once completed, your PDF will be generated at the selected location.
+   - The application will automatically save your settings, hide itself, and execute the captures.
+   - Press **ESC** if you need to cancel.
 
 ## License
 
