@@ -14,7 +14,7 @@ class ScreenPrinterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("AutoPDF Screen Printer")
-        self.root.geometry("450x460")
+        self.root.geometry("450x500")
         
         self.screenshots = []
         self.config_file = "config.json"
@@ -91,40 +91,62 @@ class ScreenPrinterApp:
         self.entry_scroll_next = tk.Entry(frame_scroll_next)
         self.entry_scroll_next.pack(side=tk.LEFT, fill="x", expand=True, padx=5)
         
-        # Click Delay, Total Clicks & Pages Frame
-        self.frame_settings = tk.Frame(self.root)
-        self.frame_settings.pack(fill="x", padx=15, pady=5)
+        # 3. Mode Specific Settings Frames
+        # Button Settings Frame
+        self.frame_btn_settings = tk.Frame(self.root)
         
-        # Click Delay
-        frame_delay = tk.Frame(self.frame_settings)
-        frame_delay.pack(side=tk.LEFT, fill="x", expand=True)
-        tk.Label(frame_delay, text="Delay (s):").pack(side=tk.LEFT)
-        self.entry_delay = tk.Entry(frame_delay, width=6)
-        self.entry_delay.insert(0, "1.0")
-        self.entry_delay.pack(side=tk.LEFT, padx=3)
+        frame_delay_btn = tk.Frame(self.frame_btn_settings)
+        frame_delay_btn.pack(side=tk.LEFT, fill="x", expand=True)
+        tk.Label(frame_delay_btn, text="Delay (s):").pack(side=tk.LEFT)
+        self.entry_delay_btn = tk.Entry(frame_delay_btn, width=8)
+        self.entry_delay_btn.insert(0, "1.0")
+        self.entry_delay_btn.pack(side=tk.LEFT, padx=5)
         
-        # Total Click / Scrolls per page
-        frame_total = tk.Frame(self.frame_settings)
-        frame_total.pack(side=tk.LEFT, fill="x", expand=True)
-        self.lbl_total = tk.Label(frame_total, text="Total Clicks:")
-        self.lbl_total.pack(side=tk.LEFT)
-        self.entry_total = tk.Entry(frame_total, width=6)
-        self.entry_total.insert(0, "5")
-        self.entry_total.pack(side=tk.LEFT, padx=3)
+        frame_total_btn = tk.Frame(self.frame_btn_settings)
+        frame_total_btn.pack(side=tk.LEFT, fill="x", expand=True)
+        tk.Label(frame_total_btn, text="Total Clicks:").pack(side=tk.LEFT)
+        self.entry_total_btn = tk.Entry(frame_total_btn, width=8)
+        self.entry_total_btn.insert(0, "5")
+        self.entry_total_btn.pack(side=tk.LEFT, padx=5)
+
+        # Scroll Settings Frame
+        self.frame_scroll_settings = tk.Frame(self.root)
         
-        # Images Per Page / Total Pages
-        frame_ipp = tk.Frame(self.frame_settings)
-        frame_ipp.pack(side=tk.LEFT, fill="x", expand=True)
-        self.lbl_ipp = tk.Label(frame_ipp, text="Images/Page:")
-        self.lbl_ipp.pack(side=tk.LEFT)
-        self.entry_ipp = tk.Entry(frame_ipp, width=6)
-        self.entry_ipp.insert(0, "1")
-        self.entry_ipp.pack(side=tk.LEFT, padx=3)
+        frame_delay_scroll = tk.Frame(self.frame_scroll_settings)
+        frame_delay_scroll.pack(side=tk.LEFT, fill="x", expand=True)
+        tk.Label(frame_delay_scroll, text="Delay (s):").pack(side=tk.LEFT)
+        self.entry_delay_scroll = tk.Entry(frame_delay_scroll, width=6)
+        self.entry_delay_scroll.insert(0, "1.0")
+        self.entry_delay_scroll.pack(side=tk.LEFT, padx=3)
+        
+        frame_total_scroll = tk.Frame(self.frame_scroll_settings)
+        frame_total_scroll.pack(side=tk.LEFT, fill="x", expand=True)
+        tk.Label(frame_total_scroll, text="Scrolls/Page:").pack(side=tk.LEFT)
+        self.entry_total_scroll = tk.Entry(frame_total_scroll, width=6)
+        self.entry_total_scroll.insert(0, "3")
+        self.entry_total_scroll.pack(side=tk.LEFT, padx=3)
+        
+        frame_page_scroll = tk.Frame(self.frame_scroll_settings)
+        frame_page_scroll.pack(side=tk.LEFT, fill="x", expand=True)
+        tk.Label(frame_page_scroll, text="Total Pages:").pack(side=tk.LEFT)
+        self.entry_page_scroll = tk.Entry(frame_page_scroll, width=6)
+        self.entry_page_scroll.insert(0, "5")
+        self.entry_page_scroll.pack(side=tk.LEFT, padx=3)
+        
+        # Formatting Frame (Auto-Stitch + Format Selection)
+        self.frame_format = tk.Frame(self.root)
+        self.frame_format.pack(fill="x", padx=15, pady=5)
         
         # Auto Stitch Checkbox
         self.stitch_var = tk.BooleanVar(value=True)
-        self.chk_stitch = tk.Checkbutton(self.root, text="Auto-Stitch (Remove Overlap in Scroll Mode)", variable=self.stitch_var, font=("Arial", 9))
-        self.chk_stitch.pack(pady=5)
+        self.chk_stitch = tk.Checkbutton(self.frame_format, text="Auto-Stitch (Remove Overlap)", variable=self.stitch_var, font=("Arial", 9))
+        self.chk_stitch.pack(side=tk.LEFT, padx=5)
+        
+        # Format radio selection
+        self.export_format_var = tk.StringVar(value="pdf")
+        tk.Label(self.frame_format, text="Format:", font=("Arial", 9)).pack(side=tk.LEFT, padx=5)
+        tk.Radiobutton(self.frame_format, text="PDF", variable=self.export_format_var, value="pdf", font=("Arial", 9)).pack(side=tk.LEFT, padx=2)
+        tk.Radiobutton(self.frame_format, text="JPG", variable=self.export_format_var, value="jpg", font=("Arial", 9)).pack(side=tk.LEFT, padx=2)
         
         # Action Buttons Frame
         self.frame_actions = tk.Frame(self.root)
@@ -133,7 +155,7 @@ class ScreenPrinterApp:
         self.btn_save_config = tk.Button(self.frame_actions, text="Save Config", command=self.save_config, font=("Arial", 10))
         self.btn_save_config.pack(side=tk.LEFT, padx=10)
         
-        self.btn_start = tk.Button(self.frame_actions, text="Start & Save to PDF", command=self.start_process, bg="green", fg="white", font=("Arial", 11, "bold"))
+        self.btn_start = tk.Button(self.frame_actions, text="Start & Save", command=self.start_process, bg="green", fg="white", font=("Arial", 11, "bold"))
         self.btn_start.pack(side=tk.LEFT, padx=10)
         
         self.lbl_tip = tk.Label(self.root, text="Tip: Press 'ESC' key to cancel while program is running.", fg="gray", font=("Arial", 9, "italic"))
@@ -159,30 +181,30 @@ class ScreenPrinterApp:
         self.entry_area.delete(0, tk.END)
         if new_mode == "button":
             self.entry_area.insert(0, self.printing_area_button)
-            self.lbl_total.config(text="Total Clicks:")
-            self.lbl_ipp.config(text="Images/Page:")
         else:
             self.entry_area.insert(0, self.printing_area_scroll)
-            self.lbl_total.config(text="Scrolls/Page:")
-            self.lbl_ipp.config(text="Total Pages:")
 
-        # 4. Refresh layout
+        # 4. Refresh layout (Pack/Unpack frames sequentially to keep correct vertical order)
         self.frame_area.pack_forget()
         self.frame_next.pack_forget()
         self.frame_scroll.pack_forget()
-        self.frame_settings.pack_forget()
-        self.chk_stitch.pack_forget()
+        self.frame_btn_settings.pack_forget()
+        self.frame_scroll_settings.pack_forget()
+        self.frame_format.pack_forget()
         self.frame_actions.pack_forget()
         self.lbl_tip.pack_forget()
         
         self.frame_area.pack(fill="x", padx=15, pady=5)
         if new_mode == "button":
             self.frame_next.pack(fill="x", padx=15, pady=5)
+            self.frame_btn_settings.pack(fill="x", padx=15, pady=5)
+            self.chk_stitch.config(state="disabled") # Auto-Stitch is only relevant for Scroll Mode
         else:
             self.frame_scroll.pack(fill="x", padx=15, pady=5)
+            self.frame_scroll_settings.pack(fill="x", padx=15, pady=5)
+            self.chk_stitch.config(state="normal")
             
-        self.frame_settings.pack(fill="x", padx=15, pady=5)
-        self.chk_stitch.pack(pady=5)
+        self.frame_format.pack(fill="x", padx=15, pady=5)
         self.frame_actions.pack(pady=10)
         self.lbl_tip.pack()
 
@@ -253,16 +275,24 @@ class ScreenPrinterApp:
                 self.entry_scroll_next.delete(0, tk.END)
                 self.entry_scroll_next.insert(0, config.get("scroll_next_button", ""))
                 
-                self.entry_delay.delete(0, tk.END)
-                self.entry_delay.insert(0, config.get("click_delay", "1.0"))
+                # Load separated delay, clicks, scrolls, pages
+                self.entry_delay_btn.delete(0, tk.END)
+                self.entry_delay_btn.insert(0, config.get("button_delay", "1.0"))
                 
-                self.entry_total.delete(0, tk.END)
-                self.entry_total.insert(0, config.get("total_clicks", "5"))
+                self.entry_total_btn.delete(0, tk.END)
+                self.entry_total_btn.insert(0, config.get("button_total_clicks", "5"))
                 
-                self.entry_ipp.delete(0, tk.END)
-                self.entry_ipp.insert(0, config.get("images_per_page", "1"))
+                self.entry_delay_scroll.delete(0, tk.END)
+                self.entry_delay_scroll.insert(0, config.get("scroll_delay", "1.0"))
+                
+                self.entry_total_scroll.delete(0, tk.END)
+                self.entry_total_scroll.insert(0, config.get("scroll_scrolls_per_page", "3"))
+                
+                self.entry_page_scroll.delete(0, tk.END)
+                self.entry_page_scroll.insert(0, config.get("scroll_total_pages", "5"))
                 
                 self.stitch_var.set(config.get("auto_stitch", True))
+                self.export_format_var.set(config.get("export_format", "pdf"))
             except Exception as e:
                 print(f"Error loading config: {e}")
 
@@ -281,10 +311,17 @@ class ScreenPrinterApp:
             "scroll_key": self.entry_scroll_key.get(),
             "scroll_ticks": self.entry_scroll_ticks.get(),
             "scroll_next_button": self.entry_scroll_next.get(),
-            "click_delay": self.entry_delay.get(),
-            "total_clicks": self.entry_total.get(),
-            "images_per_page": self.entry_ipp.get(),
-            "auto_stitch": self.stitch_var.get()
+            
+            # Save separated settings
+            "button_delay": self.entry_delay_btn.get(),
+            "button_total_clicks": self.entry_total_btn.get(),
+            
+            "scroll_delay": self.entry_delay_scroll.get(),
+            "scroll_scrolls_per_page": self.entry_total_scroll.get(),
+            "scroll_total_pages": self.entry_page_scroll.get(),
+            
+            "auto_stitch": self.stitch_var.get(),
+            "export_format": self.export_format_var.get()
         }
         try:
             with open(self.config_file, "w") as f:
@@ -454,8 +491,9 @@ class ScreenPrinterApp:
         return combined_image
 
     def start_process(self):
-        # Get active mode
+        # Get active mode and format
         mode = self.mode_var.get()
+        export_format = self.export_format_var.get()
 
         # 1. Parse Area coords
         area_str = self.entry_area.get().strip()
@@ -508,20 +546,32 @@ class ScreenPrinterApp:
                     messagebox.showerror("Error", "Optional Next Button coordinate format invalid. Must be: x, y")
                     return
             
-        # 3. Parse click / image compilation settings
+        # 3. Parse Settings for active mode
         try:
-            delay = float(self.entry_delay.get())
-            total_clicks = int(self.entry_total.get())
-            images_per_page = int(self.entry_ipp.get())
-            if images_per_page < 1:
+            if mode == "button":
+                delay = float(self.entry_delay_btn.get())
+                total_clicks = int(self.entry_total_btn.get())
+                # Button Mode does not have scrolls/page or total_pages settings
+                scrolls_per_page = 0
+                total_pages = total_clicks 
+            else: # scroll mode
+                delay = float(self.entry_delay_scroll.get())
+                scrolls_per_page = int(self.entry_total_scroll.get())
+                total_pages = int(self.entry_page_scroll.get())
+                
+            if delay < 0 or total_pages < 1 or (mode == "scroll" and scrolls_per_page < 0):
                 raise ValueError()
         except ValueError:
-            messagebox.showerror("Error", "Invalid inputs. Delay, click/scroll settings, and page settings must be valid positive numbers.")
+            messagebox.showerror("Error", "Invalid inputs. Delay, clicks, scrolls, and pages must be valid positive numbers.")
             return
             
         # 4. Save destination
-        pdf_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
-        if not pdf_path:
+        if export_format == "pdf":
+            save_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
+        else:
+            save_path = filedialog.asksaveasfilename(defaultextension=".jpg", filetypes=[("JPEG images", "*.jpg;*.jpeg")])
+            
+        if not save_path:
             return
             
         # Auto-save configuration before starting process
@@ -534,7 +584,7 @@ class ScreenPrinterApp:
             pdf_pages = []
             
             if mode == "button":
-                # Button Mode logic: simple capture loop, then optionally compile
+                # Button Mode logic: simple capture loop
                 self.screenshots = []
                 for i in range(total_clicks):
                     if keyboard.is_pressed('esc'):
@@ -550,31 +600,18 @@ class ScreenPrinterApp:
                         if not self.sleep_with_cancel_check(delay):
                             raise Exception("Process cancelled by user (ESC pressed).")
                             
-                # Group screenshots based on images_per_page
-                if images_per_page > 1:
-                    for i in range(0, len(self.screenshots), images_per_page):
-                        chunk = self.screenshots[i:i + images_per_page]
-                        max_width = max(img.width for img in chunk)
-                        total_height = sum(img.height for img in chunk)
-                        combined_img = Image.new("RGB", (max_width, total_height), "white")
-                        current_y = 0
-                        for img in chunk:
-                            combined_img.paste(img, (0, current_y))
-                            current_y += img.height
-                        pdf_pages.append(combined_img)
-                else:
-                    pdf_pages = self.screenshots
+                pdf_pages = self.screenshots
                     
             else:
                 # Scroll Mode logic:
-                # Total Pages (images_per_page input)
-                # Scrolls per page (total_clicks input)
+                # Total Pages (total_pages input)
+                # Scrolls per page (scrolls_per_page input)
                 # Auto-stitch resets per page
                 
                 center_x = (rect_coords[0] + rect_coords[2]) // 2
                 center_y = (rect_coords[1] + rect_coords[3]) // 2
                 
-                for p in range(images_per_page):
+                for p in range(total_pages):
                     # Check cancellation
                     if keyboard.is_pressed('esc'):
                         raise Exception("Process cancelled by user (ESC pressed).")
@@ -592,7 +629,7 @@ class ScreenPrinterApp:
                     page_screenshots.append(img)
                     
                     # 2. Perform scrolls and take screenshots
-                    for s in range(total_clicks):
+                    for s in range(scrolls_per_page):
                         if keyboard.is_pressed('esc'):
                             raise Exception("Process cancelled by user (ESC pressed).")
                             
@@ -617,16 +654,30 @@ class ScreenPrinterApp:
                     pdf_pages.append(stitched_page)
                     
                     # 4. If there's an optional Next button and we have more pages, click it
-                    if p < images_per_page - 1 and scroll_next_coords:
+                    if p < total_pages - 1 and scroll_next_coords:
                         pyautogui.click(scroll_next_coords[0], scroll_next_coords[1])
                         # Wait for page transition loading
                         if not self.sleep_with_cancel_check(delay + 1.0): # Extra 1.0s to allow next page to load fully
                             raise Exception("Process cancelled by user (ESC pressed).")
 
-            # Save to PDF
+            # Save / Export logic
             if pdf_pages:
-                pdf_pages[0].save(pdf_path, save_all=True, append_images=pdf_pages[1:])
-                messagebox.showinfo("Success", f"PDF saved successfully to:\n{pdf_path}")
+                if export_format == "pdf":
+                    # Save as single PDF file
+                    pdf_pages[0].save(save_path, save_all=True, append_images=pdf_pages[1:])
+                    messagebox.showinfo("Success", f"PDF saved successfully to:\n{save_path}")
+                else:
+                    # Save as individual JPG files
+                    if len(pdf_pages) == 1:
+                        pdf_pages[0].save(save_path)
+                    else:
+                        dir_name = os.path.dirname(save_path)
+                        base_name = os.path.basename(save_path)
+                        name_part, ext_part = os.path.splitext(base_name)
+                        for idx, page in enumerate(pdf_pages):
+                            page_file_path = os.path.join(dir_name, f"{name_part}_{idx+1}{ext_part}")
+                            page.save(page_file_path)
+                    messagebox.showinfo("Success", f"JPG images saved successfully to:\n{os.path.dirname(save_path)}")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred during processing:\n{str(e)}")
         finally:
